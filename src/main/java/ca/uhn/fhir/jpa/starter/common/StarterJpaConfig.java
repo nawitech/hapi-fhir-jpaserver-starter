@@ -44,6 +44,8 @@ import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
 import ca.uhn.fhir.jpa.search.IStaleSearchDeletingSvc;
 import ca.uhn.fhir.jpa.search.StaleSearchDeletingSvcImpl;
 import ca.uhn.fhir.jpa.starter.AppProperties;
+import ca.uhn.fhir.jpa.starter.BalpAuditContextService;
+import ca.uhn.fhir.jpa.starter.CustomAsyncMemoryQueueBackedFhirClientBalpSink;
 import ca.uhn.fhir.jpa.starter.annotations.OnCorsPresent;
 import ca.uhn.fhir.jpa.starter.annotations.OnImplementationGuidesPresent;
 import ca.uhn.fhir.jpa.starter.common.validation.IRepositoryValidationInterceptorFactory;
@@ -70,6 +72,10 @@ import ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor;
 import ca.uhn.fhir.rest.server.interceptor.ResponseValidatingInterceptor;
 import ca.uhn.fhir.rest.server.provider.ResourceProviderFactory;
 import ca.uhn.fhir.rest.server.util.ISearchParamRegistry;
+import ca.uhn.fhir.storage.interceptor.balp.AsyncMemoryQueueBackedFhirClientBalpSink;
+import ca.uhn.fhir.storage.interceptor.balp.BalpAuditCaptureInterceptor;
+import ca.uhn.fhir.storage.interceptor.balp.IBalpAuditContextServices;
+import ca.uhn.fhir.storage.interceptor.balp.IBalpAuditEventSink;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ResultSeverityEnum;
 import com.google.common.base.Strings;
@@ -477,6 +483,22 @@ public class StarterJpaConfig {
 
 		// register custom providers
 		registerCustomProviders(fhirServer, appContext, appProperties.getCustomProviderClasses());
+
+		//Register BALP interceptor
+
+
+		IBalpAuditContextServices contextServices = new BalpAuditContextService();
+
+		/*
+		 * Create our event sink
+		 */
+		String targetUrl = "http://localhost:8080/fhir";
+		IBalpAuditEventSink eventSink =
+			new CustomAsyncMemoryQueueBackedFhirClientBalpSink(fhirServer.getFhirContext(), targetUrl,  List.of());
+
+		BalpAuditCaptureInterceptor balpInterceptor =
+			new BalpAuditCaptureInterceptor(eventSink, contextServices);
+		fhirServer.registerInterceptor(balpInterceptor);
 
 		return fhirServer;
 	}
